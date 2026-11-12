@@ -264,7 +264,47 @@ En NixOS, el binario local de Biome de `node_modules` puede no ser ejecutable. `
 
 ## Despliegue con systemd
 
-Ejemplo de servicio de usuario. Ajusta las rutas y el binario de Node a tu instalación:
+En NixOS se recomienda un servicio de sistema ejecutado como el usuario dueño
+de la sesión de opencode (no como root). Ejemplo con `systemd.services`:
+
+```nix
+systemd.services.opencode-telegram = {
+  wantedBy = [ "multi-user.target" ];
+  wants = [ "network-online.target" ];
+  after = [ "network-online.target" ];
+  path = [
+    pkgs.nodejs_22
+    pkgs.git
+    pkgs.bash
+    pkgs.coreutils
+    pkgs.opencode
+    pkgs.try
+  ];
+  environment = {
+    HOME = "/home/miguehm";
+    NODE_ENV = "production";
+  };
+  serviceConfig = {
+    Type = "simple";
+    User = "miguehm";
+    Group = "users";
+    WorkingDirectory = "/home/miguehm/src/opencode-telegram";
+    EnvironmentFile = "/etc/opencode-telegram.env";
+    ExecStart = "${pkgs.nodejs_22}/bin/node dist/index.js";
+    Restart = "always";
+    RestartSec = 5;
+    TimeoutStopSec = 30;
+    KillSignal = "SIGTERM";
+    NoNewPrivileges = true;
+  };
+};
+```
+
+Ajusta `pkgs.opencode` y `pkgs.try` a los paquetes reales de tu instalación;
+en este servidor son `opencodePinned` (nixpkgs pinneado) y `tryPkg` (flake
+`tobi/try`).
+
+Unidad equivalente si no usas NixOS:
 
 ```ini
 [Unit]
@@ -274,25 +314,48 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/miguehm/src/tries/2026-11-12-opencode-telegram
-EnvironmentFile=/home/miguehm/src/tries/2026-11-12-opencode-telegram/.env
-Environment=PATH=/home/miguehm/.nix-profile/bin:/run/current-system/sw/bin:/usr/bin:/bin
+User=miguehm
+Group=users
+WorkingDirectory=/home/miguehm/src/opencode-telegram
+Environment=HOME=/home/miguehm
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/opencode-telegram.env
+Environment=PATH=/run/current-system/sw/bin
 ExecStart=/run/current-system/sw/bin/node dist/index.js
-Restart=on-failure
+Restart=always
 RestartSec=5
+TimeoutStopSec=30
 KillSignal=SIGTERM
+NoNewPrivileges=true
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 ```
 
 Antes de activarlo:
 
 ```bash
+cd /home/miguehm/src/opencode-telegram
+npm ci
 npm run build
-systemctl --user daemon-reload
-systemctl --user enable --now opencode-telegram
-journalctl --user -u opencode-telegram -f
+sudo install -m 600 /dev/null /etc/opencode-telegram.env
+sudoedit /etc/opencode-telegram.env   # TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, TRY_PATH...
+sudo nixos-rebuild switch --flake /etc/nixos-flake#nixos-laptop-1
+systemctl status opencode-telegram --no-pager
+journalctl -u opencode-telegram -f
+```
+
+Contenido mínimo de `/etc/opencode-telegram.env`:
+
+```env
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_USERS=TU_ID
+TRY_PATH=/home/miguehm/src/tries
+TRY_BIN=try
+OPENCODE_HOST=127.0.0.1
+OPENCODE_PORT=4096
+STATE_DIR=/home/miguehm/.local/state/opencode-telegram
+LOG_LEVEL=info
 ```
 
 Consideraciones para NixOS:
@@ -301,13 +364,15 @@ Consideraciones para NixOS:
 - Asegúrate de que Node, `opencode`, `try`, `git` y bash estén en el `PATH` del servicio.
 - `try` puede requerir instalación propia si no está en los paquetes del sistema.
 - El servidor opencode gestionado se inicia como hijo del bot y se detiene al apagar el servicio.
-- En NixOS puedes declarar el servicio de usuario con `systemd.user.services`; mantén las mismas variables en el entorno del servicio.
+- En este servidor el flake `nixos-server` declara el servicio en
+  `modules/services/opencode-telegram.nix`; se actualiza con
+  `./scripts/deploy-opencode-telegram.sh` (`git pull`, `npm ci`, build y restart).
 
 ## Solución de problemas
 
 ### `Invalid configuration`
 
-Falta `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS` o alguno de los valores no es válido. Revisa `.env`.
+Falta `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS` o alguno de los valores no es válido. Revisa `.env` en desarrollo o `/etc/opencode-telegram.env` si corre como servicio systemd.
 
 ### El bot no responde
 
