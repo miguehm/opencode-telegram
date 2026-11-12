@@ -9,6 +9,7 @@ function sleep(ms: number): Promise<void> {
 
 export class EventStream {
   private readonly listeners = new Set<Listener>()
+  private readonly connectListeners = new Set<() => void>()
   private controller: AbortController | undefined
   private readonly logger: Logger
   private running = false
@@ -24,6 +25,11 @@ export class EventStream {
   onEvent(listener: Listener): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
+  }
+
+  onConnect(listener: () => void): () => void {
+    this.connectListeners.add(listener)
+    return () => this.connectListeners.delete(listener)
   }
 
   start(): void {
@@ -62,6 +68,14 @@ export class EventStream {
     })
     if (!response.ok || !response.body) {
       throw new Error(`event stream failed with status ${response.status}`)
+    }
+
+    for (const listener of this.connectListeners) {
+      try {
+        listener()
+      } catch (error) {
+        this.logger.error("event connect listener failed", error)
+      }
     }
 
     const reader = response.body.getReader()

@@ -96,6 +96,25 @@ export type OcPermission = {
   metadata?: Record<string, unknown>
 }
 
+export type OcQuestionOption = {
+  label: string
+  description: string
+}
+
+export type OcQuestionInfo = {
+  question: string
+  header: string
+  options: OcQuestionOption[]
+  multiple?: boolean
+  custom?: boolean
+}
+
+export type OcQuestionRequest = {
+  id: string
+  sessionID: string
+  questions: OcQuestionInfo[]
+}
+
 export type OcPty = {
   id: string
   title: string

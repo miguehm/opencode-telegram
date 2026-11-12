@@ -54,6 +54,17 @@ describe("StateStore", () => {
     expect(store.findChatBySession("missing")).toBeUndefined()
   })
 
+  it("lists known project directories", async () => {
+    const dir = await tempDir()
+    const store = new StateStore(dir, logger)
+    await store.load()
+    store.update(1, (chat) => {
+      chat.projectDir = "/tmp/current"
+      chat.sessions["/tmp/other"] = "session-b"
+    })
+    expect(store.directories().sort()).toEqual(["/tmp/current", "/tmp/other"])
+  })
+
   it("recovers from corrupt state files", async () => {
     const dir = await tempDir()
     await fs.writeFile(path.join(dir, "state.json"), "{not json", "utf8")

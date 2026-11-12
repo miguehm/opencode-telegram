@@ -5,6 +5,7 @@ import type { Logger } from "./logger.js"
 import type { OpencodeApi } from "./opencode/api.js"
 import type { EventStream } from "./opencode/events.js"
 import type { PermissionBridge } from "./opencode/permissions.js"
+import type { QuestionBridge } from "./opencode/questions.js"
 import type { OpencodeServer } from "./opencode/server.js"
 import type { ProjectRegistry } from "./projects/registry.js"
 import type { TryService } from "./projects/try-service.js"
@@ -23,6 +24,7 @@ export type App = {
   tryService: TryService
   turns: TurnManager
   permissions: PermissionBridge
+  questions: QuestionBridge
   terminal: TerminalManager
   callbacks: CallbackStore
   api: Api

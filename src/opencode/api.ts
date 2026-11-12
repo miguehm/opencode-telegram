@@ -8,6 +8,7 @@ import type {
   OcProvider,
   OcProviders,
   OcPty,
+  OcQuestionRequest,
   OcSession,
   OcTodo,
 } from "./types.js"
@@ -18,6 +19,10 @@ export type PromptBody = {
   model?: { providerID: string; modelID: string }
 }
 
+function isNotFound(error: unknown): boolean {
+  return error instanceof Error && error.name === "NotFoundError"
+}
+
 export class OpencodeApi {
   private readonly baseUrl: string
   private readonly headers: Record<string, string>
@@ -26,6 +31,37 @@ export class OpencodeApi {
   constructor(baseUrl: string, headers: Record<string, string> = {}) {
     this.baseUrl = baseUrl.replace(/\/+$/, "")
     this.headers = headers
+  }
+
+  private async fetchJson<T>(
+    path: string,
+    init: RequestInit = {},
+    directory?: string,
+    query?: Record<string, string>,
+  ): Promise<T> {
+    const url = new URL(`${this.baseUrl}${path}`)
+    if (directory) url.searchParams.set("directory", directory)
+    for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value)
+    const headers: Record<string, string> = { ...this.headers }
+    if (init.body !== undefined) headers["content-type"] = "application/json"
+    const response = await fetch(url, {
+      ...init,
+      headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
+    })
+    if (response.status === 404) {
+      const error = new Error(`opencode request not found: ${path}`)
+      error.name = "NotFoundError"
+      throw error
+    }
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      const suffix = body ? `: ${body.slice(0, 300)}` : ""
+      throw new Error(`opencode request failed (${response.status}) ${path}${suffix}`)
+    }
+    if (response.status === 204) return undefined as T
+    const text = await response.text()
+    if (!text) return undefined as T
+    return JSON.parse(text) as T
   }
 
   client(directory?: string): OpencodeClient {
@@ -223,6 +259,89 @@ export class OpencodeApi {
       body: { response },
       throwOnError: true,
     })
+  }
+
+  async listQuestions(directory: string): Promise<OcQuestionRequest[]> {
+    try {
+      const raw = await this.fetchJson<OcQuestionRequest[]>("/question", {}, directory)
+      return raw ?? []
+    } catch (error) {
+      if (isNotFound(error)) return []
+      throw error
+    }
+  }
+
+  async listQuestionsV2(directory: string): Promise<OcQuestionRequest[]> {
+    try {
+      const raw = await this.fetchJson<{ data?: OcQuestionRequest[] }>(
+        "/api/question/request",
+        {},
+        undefined,
+        { "location[directory]": directory },
+      )
+      return raw?.data ?? []
+    } catch (error) {
+      if (isNotFound(error)) return []
+      throw error
+    }
+  }
+
+  async replyQuestion(directory: string, requestID: string, answers: string[][]): Promise<boolean> {
+    try {
+      const accepted = await this.fetchJson<boolean>(
+        `/question/${encodeURIComponent(requestID)}/reply`,
+        { method: "POST", body: JSON.stringify({ answers }) },
+        directory,
+      )
+      return accepted !== false
+    } catch (error) {
+      if (isNotFound(error)) return false
+      throw error
+    }
+  }
+
+  async rejectQuestion(directory: string, requestID: string): Promise<boolean> {
+    try {
+      const accepted = await this.fetchJson<boolean>(
+        `/question/${encodeURIComponent(requestID)}/reject`,
+        { method: "POST" },
+        directory,
+      )
+      return accepted !== false
+    } catch (error) {
+      if (isNotFound(error)) return false
+      throw error
+    }
+  }
+
+  async replyQuestionV2(
+    sessionID: string,
+    requestID: string,
+    answers: string[][],
+  ): Promise<boolean> {
+    try {
+      await this.fetchJson(
+        `/api/session/${encodeURIComponent(sessionID)}/question/${encodeURIComponent(requestID)}/reply`,
+        { method: "POST", body: JSON.stringify({ answers }) },
+      )
+      return true
+    } catch (error) {
+      if (isNotFound(error)) return false
+      throw error
+    }
+  }
+
+  async rejectQuestionV2(sessionID: string, requestID: string): Promise<boolean> {
+    try {
+      await this.fetchJson(
+        `/api/session/${encodeURIComponent(sessionID)}/question/${encodeURIComponent(requestID)}/reject`,
+        { method: "POST" },
+      )
+      return true
+    } catch (error) {
+      if (isNotFound(error)) return false
+      throw error
+    }
   }
 
   async createPty(

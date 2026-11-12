@@ -87,6 +87,15 @@ export class StateStore {
     return undefined
   }
 
+  directories(): string[] {
+    const result = new Set<string>()
+    for (const chat of Object.values(this.data.chats)) {
+      if (chat.projectDir) result.add(chat.projectDir)
+      for (const directory of Object.keys(chat.sessions)) result.add(directory)
+    }
+    return [...result]
+  }
+
   private scheduleSave(): void {
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => {

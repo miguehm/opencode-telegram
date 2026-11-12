@@ -146,6 +146,7 @@ export function registerChat(bot: Bot, app: App): void {
     const chatId = chatIdOf(ctx)
     const chat = app.state.get(chatId)
     try {
+      await app.questions.rejectForChat(chatId)
       if (app.turns.isBusy(chatId)) {
         await app.turns.abort(chatId)
         await replyMarkdown(ctx, "⛔ Respuesta abortada.")
@@ -159,6 +160,12 @@ export function registerChat(bot: Bot, app: App): void {
     } catch (error) {
       await replyMarkdown(ctx, `⚠️ ${errorMessage(error)}`)
     }
+  })
+
+  bot.command("question", async (ctx) => {
+    const chatId = chatIdOf(ctx)
+    if (await app.questions.showPending(chatId)) return
+    await replyMarkdown(ctx, "No hay preguntas pendientes.")
   })
 
   bot.command("compact", async (ctx) => {

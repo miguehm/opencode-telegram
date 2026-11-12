@@ -18,6 +18,7 @@ export const BOT_COMMANDS = [
   { command: "term", description: "Abrir o cerrar terminal PTY" },
   { command: "cmd", description: "Ejecutar slash command de opencode" },
   { command: "status", description: "Estado del proyecto y sesión" },
+  { command: "question", description: "Mostrar la pregunta pendiente" },
   { command: "help", description: "Mostrar ayuda" },
 ]
 
@@ -49,7 +50,8 @@ export const HELP_HTML = `<b>🤖 opencode Telegram bot</b>
 <code>/key &lt;ctrl-c|ctrl-d|tab|esc|up|down|enter&gt;</code> — enviar tecla
 
 <b>Uso normal</b>
-Escribe un mensaje sin <code>/</code> para enviarlo al agente activo.`
+Escribe un mensaje sin <code>/</code> para enviarlo al agente activo.
+Si opencode hace una pregunta, respóndela con los botones o con <code>/question</code> para volver a mostrarla.`
 
 export function registerHelp(bot: Bot): void {
   bot.command(["start", "help"], async (ctx) => {

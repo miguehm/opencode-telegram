@@ -58,9 +58,10 @@ async function register(bot: Bot, app: App): Promise<void> {
     const chatId = chatIdOf(ctx)
     const payload = app.callbacks.take(chatId, data.slice(3))
     if (!payload) {
-      await ctx
-        .answerCallbackQuery({ text: "Botón caducado. Vuelve a abrir el menú con /p." })
-        .catch(() => undefined)
+      const stale = app.questions.hasPendingChat(chatId)
+        ? "Botón caducado. Usa /question para volver a mostrarla."
+        : "Botón caducado. Vuelve a abrir el menú con /p."
+      await ctx.answerCallbackQuery({ text: stale }).catch(() => undefined)
       return
     }
 
@@ -161,6 +162,11 @@ async function register(bot: Bot, app: App): Promise<void> {
           await ctx.answerCallbackQuery({ text: result }).catch(() => undefined)
           return
         }
+        case "question": {
+          const result = await app.questions.resolve(chatId, payload)
+          await ctx.answerCallbackQuery({ text: result.slice(0, 190) }).catch(() => undefined)
+          return
+        }
         case "pty": {
           const action = text(payload.action)
           const terminal = app.terminal.get(chatId)
@@ -193,6 +199,7 @@ async function register(bot: Bot, app: App): Promise<void> {
   bot.on("message:text", async (ctx) => {
     const value = ctx.message.text
     const chatId = chatIdOf(ctx)
+    if (await app.questions.captureText(chatId, value)) return
     const terminal = app.terminal.get(chatId)
     if (terminal) {
       terminal.sendLine(value)
@@ -200,6 +207,10 @@ async function register(bot: Bot, app: App): Promise<void> {
     }
     if (value.startsWith("/")) {
       await replyMarkdown(ctx, "Comando desconocido. Usa `/help` para ver la lista.")
+      return
+    }
+    if (app.questions.hasPendingChat(chatId)) {
+      await replyMarkdown(ctx, "Responde la pregunta con los botones o usa `/abort`.")
       return
     }
     await sendPrompt(ctx, app, value)

@@ -7,6 +7,7 @@ import { createLogger } from "./logger.js"
 import { OpencodeApi } from "./opencode/api.js"
 import { EventStream } from "./opencode/events.js"
 import { PermissionBridge } from "./opencode/permissions.js"
+import { QuestionBridge } from "./opencode/questions.js"
 import { OpencodeServer } from "./opencode/server.js"
 import { ProjectRegistry } from "./projects/registry.js"
 import { TryService } from "./projects/try-service.js"
@@ -36,7 +37,10 @@ async function main(): Promise<void> {
   const projects = new ProjectRegistry(config.tryPath, logger)
   const tryService = new TryService(config.tryPath, config.tryBin, logger)
   const events = new EventStream(info.url, headers, logger)
-  const turns = new TurnManager(bot.api, opencode, events, logger)
+  const questions = new QuestionBridge(bot.api, opencode, events, state, callbacks, logger)
+  const turns = new TurnManager(bot.api, opencode, events, logger, {
+    hasPendingSession: (sessionID) => questions.hasPendingSession(sessionID),
+  })
   const permissions = new PermissionBridge(bot.api, opencode, events, state, callbacks, logger)
   const terminal = new TerminalManager(bot.api, opencode, info.url, headers, callbacks, logger)
 
@@ -51,6 +55,7 @@ async function main(): Promise<void> {
     tryService,
     turns,
     permissions,
+    questions,
     terminal,
     callbacks,
     api: bot.api,

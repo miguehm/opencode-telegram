@@ -14,6 +14,7 @@ El bot ofrece una interfaz nativa de Telegram, no una TUI completa: muestra el s
 - Cambio de agente equivalente a `Tab` (`plan` / `build`).
 - Sesiones de opencode por proyecto, con creación, cambio, renombrado, borrado y compactación.
 - Permisos de opencode enviados como botones inline.
+- Preguntas de opencode respondidas con botones, selección múltiple o texto libre.
 - Ejecución de comandos con `/sh`, `/cmd` y `/exec`.
 - Terminal interactiva por WebSocket mediante `/term`.
 - Persistencia del proyecto, sesión, agente, modelo y preferencias por chat.

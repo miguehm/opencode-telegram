@@ -94,6 +94,7 @@ function app(): App {
     tryService: {} as App["tryService"],
     turns: { isBusy: () => false } as unknown as App["turns"],
     permissions: {} as App["permissions"],
+    questions: {} as App["questions"],
     terminal: { get: () => undefined } as unknown as App["terminal"],
     callbacks,
     api: {} as App["api"],

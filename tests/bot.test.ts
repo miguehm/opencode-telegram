@@ -8,7 +8,7 @@ import type { App } from "../src/app.js"
 import { setupBot } from "../src/bot.js"
 import { createLogger } from "../src/logger.js"
 import { StateStore } from "../src/state.js"
-import { CallbackStore } from "../src/telegram/callbacks.js"
+import { type CallbackPayload, CallbackStore } from "../src/telegram/callbacks.js"
 
 type Call = { method: string; payload: Record<string, unknown> }
 
@@ -20,6 +20,12 @@ type Harness = {
   projectDir: string
   prompts: Array<{ directory: string; sessionId: string; text: string; agent: string }>
   turns: Array<{ chatId: number; directory: string; sessionId: string }>
+  questions: {
+    capture: boolean
+    pending: boolean
+    captures: string[]
+    resolved: CallbackPayload[]
+  }
 }
 
 const logger = createLogger("error")
@@ -61,6 +67,12 @@ async function harness(): Promise<Harness> {
   const calls: Call[] = []
   const prompts: Harness["prompts"] = []
   const turns: Harness["turns"] = []
+  const questions: Harness["questions"] = {
+    capture: false,
+    pending: false,
+    captures: [],
+    resolved: [],
+  }
 
   const bot = new Bot("123:test")
   bot.api.config.use(async (_prev, method, payload) => {
@@ -145,6 +157,20 @@ async function harness(): Promise<Harness> {
       fail: async () => undefined,
     } as unknown as App["turns"],
     permissions: {} as App["permissions"],
+    questions: {
+      captureText: async (_chatId: number, value: string) => {
+        if (!questions.capture) return false
+        questions.captures.push(value)
+        return true
+      },
+      hasPendingChat: () => questions.pending,
+      resolve: async (_chatId: number, payload: CallbackPayload) => {
+        questions.resolved.push(payload)
+        return "ok"
+      },
+      rejectForChat: async () => 0,
+      showPending: async () => false,
+    } as unknown as App["questions"],
     terminal: {
       get: () => undefined,
       open: async () => undefined,
@@ -156,7 +182,7 @@ async function harness(): Promise<Harness> {
 
   await setupBot(bot, app)
   await bot.init()
-  return { bot, app, calls, root, projectDir, prompts, turns }
+  return { bot, app, calls, root, projectDir, prompts, turns, questions }
 }
 
 describe("bot handlers", () => {
@@ -202,6 +228,41 @@ describe("bot handlers", () => {
       agent: "build",
     })
     expect(h.turns.at(-1)?.chatId).toBe(1)
+  })
+
+  it("captures text answers for pending questions", async () => {
+    h.questions.capture = true
+    const before = h.prompts.length
+    await h.bot.handleUpdate(updateMessage(9, "respuesta libre"))
+    h.questions.capture = false
+    expect(h.questions.captures).toEqual(["respuesta libre"])
+    expect(h.prompts.length).toBe(before)
+  })
+
+  it("routes question callbacks", async () => {
+    const token = h.app.callbacks.put(1, {
+      kind: "question",
+      action: "option",
+      requestId: "que_1",
+      index: 0,
+      choice: 1,
+    })
+    await h.bot.handleUpdate({
+      update_id: 10,
+      callback_query: {
+        id: "cb3",
+        from: { id: 1, is_bot: false, first_name: "U" },
+        chat_instance: "x",
+        data: `cb:${token}`,
+        message: {
+          message_id: 1,
+          date: 1,
+          chat: { id: 1, type: "private" },
+          text: "question",
+        },
+      },
+    } as Update)
+    expect(h.questions.resolved.at(-1)).toMatchObject({ requestId: "que_1", choice: 1 })
   })
 
   it("executes a palette callback", async () => {

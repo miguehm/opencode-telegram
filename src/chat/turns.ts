@@ -30,6 +30,7 @@ export class TurnManager {
     private readonly opencode: OpencodeApi,
     events: EventStream,
     private readonly logger: Logger,
+    private readonly questions?: { hasPendingSession(sessionID: string): boolean },
   ) {
     events.onEvent((event) => this.handle(event))
   }
@@ -152,11 +153,13 @@ export class TurnManager {
       case "session.status": {
         const status = properties.status as { type?: string } | undefined
         if (status?.type === "busy" || status?.type === "retry") this.startTyping(turn)
-        if (status?.type === "idle") void this.finish(turn)
+        if (status?.type === "idle" && !this.hasPendingQuestion(turn.sessionId)) {
+          void this.finish(turn)
+        }
         return
       }
       case "session.idle": {
-        void this.finish(turn)
+        if (!this.hasPendingQuestion(turn.sessionId)) void this.finish(turn)
         return
       }
       case "session.error": {
@@ -171,6 +174,10 @@ export class TurnManager {
       default:
         return
     }
+  }
+
+  private hasPendingQuestion(sessionId: string): boolean {
+    return this.questions?.hasPendingSession(sessionId) ?? false
   }
 
   private update(turn: Turn): void {

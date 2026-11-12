@@ -100,6 +100,7 @@ export async function runPaletteAction(app: App, ctx: Context, action: string): 
   if (action === "abort") {
     const project = app.state.get(chatId).projectDir
     try {
+      await app.questions.rejectForChat(chatId)
       if (app.turns.isBusy(chatId)) {
         await app.turns.abort(chatId)
       } else if (project) {
