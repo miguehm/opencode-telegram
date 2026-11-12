@@ -163,11 +163,14 @@ Puedes elegir el proyecto de prueba con `SMOKE_PROJECT=/ruta/al/proyecto`.
 | `/rename <título>` | Renombra la sesión activa. |
 | `/delete` | Pide confirmación y borra la sesión activa. |
 | `/abort` | Aborta la respuesta o ejecución en curso. |
+| `/question` | Muestra la pregunta pendiente de opencode y permite responderla. |
 | `/compact` | Compacta la sesión activa. |
 | `/status` | Muestra proyecto, sesión, agente, modelo, coste, tokens y si hay una ejecución o terminal activa. |
 | `/thinking [on\|off]` | Activa o desactiva la visualización del razonamiento; sin argumento la alterna. |
 
 Mientras hay una respuesta en curso, no puedes cambiar de proyecto, crear o cambiar de sesión activa ni abrir o cambiar la terminal. Usa `/abort` primero.
+
+Cuando opencode hace una pregunta, el bot la envía con botones inline: una opción, varias opciones con `Listo` o texto libre. También puedes rechazarla para cancelar esa petición. Si hay una pregunta pendiente, `/question` la vuelve a mostrar. Al reconectar, el bot recupera las preguntas pendientes de los proyectos conocidos.
 
 ### Agentes y modelos
 
@@ -404,7 +407,11 @@ Abre `/term` con un proyecto seleccionado. Si el shell no arranca, comprueba que
 
 ### Los botones dicen que caducaron
 
-Los tokens de los botones inline caducan a los 15 minutos. Vuelve a abrir el menú con `/p`.
+Los tokens de los botones inline caducan a los 15 minutos. Vuelve a abrir el menú con `/p` o la pregunta con `/question`.
+
+### Una pregunta de opencode no muestra botones
+
+Puede que ya se haya resuelto, rechazado o que el bot se haya reiniciado. Usa `/question` para volver a cargar la pregunta pendiente. Si no aparece, el turno ya no espera respuesta.
 
 ### Error de lint en NixOS
 
